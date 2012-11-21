@@ -40,6 +40,9 @@ struct vmbuf {
     size_t read_loc;
     size_t write_loc;
 };
+#ifdef __APPLE__
+#include "apple.h"
+#endif
 
 #define VMBUF_INITIALIZER { NULL, 0, 0, 0 }
 #define VMBUF_INIT(var) (var) = ((struct vmbuf)VMBUF_INITIALIZER)

@@ -37,7 +37,7 @@ static int get_free_entry(struct mysql_login_info *info, struct list *l, struct 
     if (list_empty(l))
         return -1;
     struct list *item = list_pop_head(l);
-    *mysql = LIST_ENTRY(item, struct mysql_pool_entry, l);
+    *mysql = LIST_ENT(item, struct mysql_pool_entry, l);
     // connect if haven't already done so.
     if (!((*mysql)->helper).is_connected) {
         if (0 > mysql_helper_connect(&(*mysql)->helper, info))

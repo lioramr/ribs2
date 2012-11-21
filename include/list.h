@@ -29,7 +29,7 @@ struct list {
 #define LIST_INITIALIZER(name) { &(name), &(name) }
 #define LIST_CREATE(name) struct list name = LIST_INITIALIZER(name);
 
-#define LIST_ENTRY(ptr, type, member)                   \
+#define LIST_ENT(ptr, type, member)                   \
     ((type *)((char *)(ptr)-offsetof(type, member)))
 
 _RIBS_INLINE_ void list_init(struct list *list) {
