@@ -25,30 +25,16 @@
 #include "hashtable.h"
 #include "sstr.h"
 #include "logger.h"
+#include "mime_file.h"
 
 SSTRL(MIME_TYPES, "/etc/mime.types");
 SSTRL(MIME_DELIMS, "\t ");
 SSTRL(DEFAULT_MIME_TYPE, "text/plain");
 static struct hashtable ht_mime_types = HASHTABLE_INITIALIZER;
 
-int mime_types_init(void) {
-    if (hashtable_get_size(&ht_mime_types) > 0)
-        return 1;
-    LOGGER_INFO("initializing mime types");
-    int fd = open(MIME_TYPES, O_RDONLY);
-    struct stat st;
-    if (0 > fstat(fd, &st))
-        return LOGGER_PERROR("mime_types fstat"), close(fd), -1;
-    void *mem = mmap(NULL, st.st_size + 1, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-    if (MAP_FAILED == mem)
-        return LOGGER_PERROR("mime_types mmap"), close(fd), -1;
-
-    hashtable_init(&ht_mime_types, 4096);
-    char *content = (char *)mem;
-    char *content_end = content + st.st_size;
-
-    while (content < content_end)
-    {
+void build_mime_table(char *content, char *content_end) {
+  hashtable_init(&ht_mime_types, 4096);
+  while (content < content_end) {
         // find end of line
         char *line = content, *p = line;
         for (; p < content_end && *p != '\n'; ++p);
@@ -69,8 +55,28 @@ int mime_types_init(void) {
             hashtable_insert(&ht_mime_types, ext, strlen(ext), mime, strlen(mime) + 1);
         }
     }
-    munmap(mem, st.st_size + 1);
-    close(fd);
+}
+
+int mime_types_init(void) {
+
+    if (hashtable_get_size(&ht_mime_types) > 0)
+        return 1;
+    LOGGER_INFO("initializing mime types");
+    int fd = open(MIME_TYPES, O_RDONLY);
+    /* if can't find mime file, use copy - needed for mac osx */
+    if (0 > fd) {
+      build_mime_table(mime_file, mime_file+sizeof(mime_file));
+    } else {
+      struct stat st;
+      if (0 > fstat(fd, &st))
+        return LOGGER_PERROR("mime_types fstat"), close(fd), -1;
+      void *mem = mmap(NULL, st.st_size + 1, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+      if (MAP_FAILED == mem)
+        return LOGGER_PERROR("mime_types mmap"), close(fd), -1;
+      build_mime_table((char *)mem, mem + st.st_size);
+      munmap(mem, st.st_size + 1);
+      close(fd);
+    }
     return 0;
 }
 

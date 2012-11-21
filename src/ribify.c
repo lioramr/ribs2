@@ -26,10 +26,15 @@
 #include <stdarg.h>
 #include <sys/uio.h>
 #include <netdb.h>
-#include <sys/eventfd.h>
 #include <signal.h>
+
+#ifdef __APPLE__
+#include "apple.h"
+#else
+#include <sys/eventfd.h>
 #include <sys/timerfd.h>
 #include <sys/sendfile.h>
+#endif
 
 int ribs_connect(int sockfd, const struct sockaddr *addr, socklen_t addrlen) {
     int flags=fcntl(sockfd, F_GETFL);
