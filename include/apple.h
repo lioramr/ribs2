@@ -25,7 +25,6 @@
 /* fstatat flags */
 #define AT_SYMLINK_NOFOLLOW 1
 
-
 /* socket flags */
 #define SOCK_NONBLOCK (1<<30)
 #define SOCK_CLOEXEC (1<<29)
@@ -52,20 +51,20 @@ enum epoll_ctl {
 #define TFD_NONBLOCK (1<<2)
 
 typedef union epoll_data {
-  void *ptr;
-  int fd;
-  uint32_t u32;
-  uint64_t u64;
+    void *ptr;
+    int fd;
+    uint32_t u32;
+    uint64_t u64;
 } epoll_data_t;
 
 struct epoll_event {
-  int32_t events;
-  epoll_data_t data;
+    int32_t events;
+    epoll_data_t data;
 };
 
 struct itimerspec {
-  struct timespec it_interval; /* Timer interval */
-  struct timespec it_value;    /* initial expiration */
+    struct timespec it_interval; /* Timer interval */
+    struct timespec it_value;    /* initial expiration */
 };
 
 int kqfd;

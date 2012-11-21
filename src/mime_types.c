@@ -33,8 +33,8 @@ SSTRL(DEFAULT_MIME_TYPE, "text/plain");
 static struct hashtable ht_mime_types = HASHTABLE_INITIALIZER;
 
 void build_mime_table(char *content, char *content_end) {
-  hashtable_init(&ht_mime_types, 4096);
-  while (content < content_end) {
+    hashtable_init(&ht_mime_types, 4096);
+    while (content < content_end) {
         // find end of line
         char *line = content, *p = line;
         for (; p < content_end && *p != '\n'; ++p);
@@ -58,28 +58,26 @@ void build_mime_table(char *content, char *content_end) {
 }
 
 int mime_types_init(void) {
-
     if (hashtable_get_size(&ht_mime_types) > 0)
         return 1;
     LOGGER_INFO("initializing mime types");
     int fd = open(MIME_TYPES, O_RDONLY);
     /* if can't find mime file, use copy - needed for mac osx */
     if (0 > fd) {
-      build_mime_table(mime_file, mime_file+sizeof(mime_file));
+        build_mime_table(mime_file, mime_file+sizeof(mime_file));
     } else {
-      struct stat st;
-      if (0 > fstat(fd, &st))
-        return LOGGER_PERROR("mime_types fstat"), close(fd), -1;
-      void *mem = mmap(NULL, st.st_size + 1, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-      if (MAP_FAILED == mem)
-        return LOGGER_PERROR("mime_types mmap"), close(fd), -1;
-      build_mime_table((char *)mem, mem + st.st_size);
-      munmap(mem, st.st_size + 1);
-      close(fd);
+        struct stat st;
+        if (0 > fstat(fd, &st))
+            return LOGGER_PERROR("mime_types fstat"), close(fd), -1;
+        void *mem = mmap(NULL, st.st_size + 1, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+        if (MAP_FAILED == mem)
+            return LOGGER_PERROR("mime_types mmap"), close(fd), -1;
+        build_mime_table((char *)mem, mem + st.st_size);
+        munmap(mem, st.st_size + 1);
+        close(fd);
     }
     return 0;
 }
-
 
 const char *mime_types_by_ext(const char *ext) {
     const char *res = DEFAULT_MIME_TYPE;
