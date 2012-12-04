@@ -27,16 +27,22 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
-#include <sys/epoll.h>
 #include <unistd.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <sys/uio.h>
-#include <sys/sendfile.h>
 #include "mime_types.h"
 #include "logger.h"
+
+#ifdef __APPLE__
+#include "apple.h"
+#else
+#include <sys/epoll.h>
+#include <sys/sendfile.h>
+#endif
+
 #define HTTP_DEF_STR(var,str)                   \
     const char var[]=str
 #include "http_defs.h"

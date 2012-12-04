@@ -26,6 +26,10 @@
 #include <sys/mman.h>
 #include <string.h>
 
+#ifdef __APPLE__
+#include "apple.h"
+#endif
+
 /* linear hashing */
 /*
 

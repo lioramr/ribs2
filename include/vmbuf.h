@@ -29,6 +29,10 @@
 #include <string.h>
 #include <time.h>
 
+#ifdef __APPLE__
+#include "apple.h"
+#endif
+
 #include "_vmbuf_preamble.h"
 #include "_vmbuf.h"
 
