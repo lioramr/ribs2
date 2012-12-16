@@ -176,7 +176,8 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags) {
     struct mmap_entry entry;
     int mmap_flags;
     int mmap_prot;
-    size_t first_attempt_size;
+    size_t first_attempt_addr = vmbuf_align((size_t)old_address+old_size);
+    size_t first_attempt_size = (new_size - old_size) - (first_attempt_addr - ((size_t)old_address+old_size));
     if (flags != 0 && flags != MREMAP_MAYMOVE)
         return LOGGER_PERROR("only MREMAP_MAYMOVE is supported currently by OSX mremap"), (void *)-1;
     if (0 > metadata_table_lookup((uint64_t)old_address, &entry))
@@ -185,9 +186,8 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags) {
     mmap_flags = decode_flags((entry.meta & 4095) >> 4);
     mmap_prot = decode_prot((entry.meta & 15));
 
-    first_attempt_size = (new_size - old_size) - (((~(old_size & 4095))+1) & 4095);
-    new_address = mmap((void *)vmbuf_align((size_t)old_address+old_size), first_attempt_size, mmap_prot, mmap_flags, entry.fd, entry.offset+old_size);
-    if ((size_t)new_address != (size_t)vmbuf_align((size_t)old_address+old_size)) {
+    new_address = mmap((void *)first_attempt_addr, first_attempt_size, mmap_prot, mmap_flags, entry.fd, entry.offset+old_size);
+    if ((size_t)new_address != first_attempt_addr) {
         munmap(new_address, first_attempt_size);
         new_address = mmap(NULL, new_size, mmap_prot, mmap_flags, entry.fd, entry.offset);
         memcpy(new_address, old_address, old_size);
@@ -196,9 +196,8 @@ void *mremap(void *old_address, size_t old_size, size_t new_size, int flags) {
         entry.meta &= 4095;
         entry.meta |= (uint64_t)new_address;
         metadata_table_insert(entry);
-    } else {
+    } else
         new_address = old_address;
-    }
 
     return new_address;
 }
