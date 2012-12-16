@@ -11,14 +11,197 @@
 #undef mmap
 #undef munmap
 
-#define CANARY 0xDEADBEEF
-
-struct mmap_meta {
-  uint32_t canary;
-  size_t length;
-  int prot;
-  int flags;
+struct metadata_table {
+  struct mmap_entry *data;
+  uint32_t capacity;
+  size_t size;
 };
+
+struct mmap_entry {
+  /* 52 bits for addr | 8 bits for flags | 4 bits for prot */
+  uint64_t meta;
+  int fd;
+  off_t offset;
+};
+
+/* hashtable of mmap_entry structs */
+static struct metadata_table table = {NULL, 0, 0}; 
+
+/* recognized mmap flags array */
+static const uint32_t FLAGS[] = {MAP_SHARED, MAP_PRIVATE, MAP_ANON, MAP_FILE};
+static const int NUM_FLAGS = sizeof(FLAGS)/sizeof(uint32_t);
+/* prot array */
+static const uint32_t PROT[] = {PROT_NONE, PROT_READ, PROT_WRITE, PROT_EXEC};
+static const int NUM_PROT = sizeof(PROT)/sizeof(uint32_t);
+
+static uint64_t encode_flags(int decoded_flags) {
+  uint64_t flags_encoded = 0;
+  int i;
+  for (i = 0; i < NUM_FLAGS; ++i) {
+    flags_encoded |= (decoded_flags & FLAGS[i]) ? (1 << i) : 0;
+  }
+  return flags_encoded;
+}
+
+static int decode_flags(uint64_t encoded_flags) {
+  int flags_decoded = 0;
+  int i;
+  for (i = 0; i < NUM_FLAGS; ++i) {
+    flags_decoded |= (int)(encoded_flags & (1 << i)) ? FLAGS[i] : 0;
+  }
+  return flags_decoded;
+}
+
+static uint64_t encode_prot(int decoded_prot) {
+  int prot_encoded = 0;
+  int i;
+  for (i = 0; i < NUM_PROT; ++i)
+    prot_encoded |= (decoded_prot & PROT[i]) ? (1 << i) : 0;
+  return prot_encoded;
+}
+
+static int decode_prot(uint64_t encoded_prot) {
+  int prot_decoded = 0;
+  int i;
+  for (i = 0; i < NUM_PROT; ++i)
+    prot_decoded |= encoded_prot & (1 << i) ? PROT[i] : 0;
+  return prot_decoded;
+}
+
+static inline uint64_t data_to_addr(uint64_t data) {
+  return data & -4096;
+}
+
+static inline uint32_t capacity_to_size(uint32_t capacity) {
+  return (capacity+1)*sizeof(struct mmap_entry);
+}
+
+/* one less than real capacity to avoid collisions while hashing page-aligned addresses */
+static inline uint32_t size_to_capacity(uint32_t size) {
+  return (size / sizeof(struct mmap_entry)) - 1;
+}
+
+static void metadata_table_grow() {
+  uint32_t i;
+  struct mmap_entry *old_data = table.data;
+  uint32_t old_capacity = table.capacity;
+  uint32_t new_size = capacity_to_size(table.capacity) << 1;
+  table.data = mmap(NULL, new_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+  table.capacity = size_to_capacity(new_size);
+
+  for (i = 0; i < old_capacity; ++i) {
+    if (old_data[i].meta)
+      table.data[data_to_addr(old_data[i].meta) % table.capacity] = old_data[i];
+  }
+  munmap(old_data, capacity_to_size(old_capacity));
+}
+
+static inline void create_metadata_table() {
+   static const size_t META_MAP_INITIAL_SIZE = 4096;
+   table.data = mmap(NULL, META_MAP_INITIAL_SIZE, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+   table.capacity = size_to_capacity(META_MAP_INITIAL_SIZE);
+}
+
+static void metadata_table_insert(struct mmap_entry entry) {
+  if (table.data == NULL)
+    create_metadata_table();
+  else if (table.size > table.capacity >> 1)
+    metadata_table_grow();
+
+  struct mmap_entry *e = table.data + (data_to_addr(entry.meta) % table.capacity);
+  while (e->meta) {
+    ++e;
+    if (e-table.data >= table.capacity)
+      e = table.data;
+  }
+  memcpy(e, &entry, sizeof(struct mmap_entry));
+  ++table.size;
+}
+
+static int metadata_table_find_addr(uint64_t addr, struct mmap_entry **entry) {
+  struct mmap_entry *e = table.data + (addr % table.capacity);
+  while (data_to_addr(e->meta) != addr) {
+    if (!e->meta)
+      return -1;
+    ++e;
+    if (e-table.data >= table.capacity)
+      e = table.data;
+  }
+  *entry = e;
+  return 0;
+}
+
+static int metadata_table_lookup(uint64_t addr, struct mmap_entry *entry) {
+  if (table.data == NULL)
+    create_metadata_table();
+  struct mmap_entry *entry_ptr = NULL;
+  if (0 > metadata_table_find_addr(addr, &entry_ptr))
+    return -1;
+  *entry = *entry_ptr;
+  return 0;
+}
+
+static int metadata_table_del(uint64_t addr) {
+  struct mmap_entry *entry = NULL;
+  if (0 > metadata_table_find_addr(addr, &entry))
+    return -1;
+  memset(entry, '\0', sizeof(struct mmap_entry));
+  --table.size;
+  return 0;
+}
+
+void *mmap_apple(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
+  struct mmap_entry entry;
+  void *new_addr = mmap(addr, length, prot, flags, fd, offset);
+
+  entry.meta = (uint64_t)new_addr & -4096;
+  entry.meta |= encode_flags(flags) << 4;
+  entry.meta |= encode_prot(prot);
+  entry.fd = fd;
+  entry.offset = offset;
+  metadata_table_insert(entry);
+
+  return new_addr;
+}
+
+int munmap_apple(void *addr, size_t len) {
+  if (0 > metadata_table_del((uint64_t)addr))
+    LOGGER_PERROR("apple.h was not included before the mmap syscall");
+  return munmap(addr, len);
+}
+
+/* tries appending to current mapping.  If fails, makes new mapping somewhere else */
+void *mremap(void *old_address, size_t old_size, size_t new_size, int flags) {
+    void *new_address;
+    struct mmap_entry entry;
+    int mmap_flags;
+    int mmap_prot;
+    size_t first_attempt_size;
+    if (flags != 0 && flags != MREMAP_MAYMOVE)
+        return LOGGER_PERROR("only MREMAP_MAYMOVE is supported currently by OSX mremap"), (void *)-1;
+    if (0 > metadata_table_lookup((uint64_t)old_address, &entry))
+      return LOGGER_PERROR("apple.h was not included before the mmap syscall"), (void *)-1;
+    
+    mmap_flags = decode_flags((entry.meta & 4095) >> 4);
+    mmap_prot = decode_prot((entry.meta & 15));
+
+    first_attempt_size = (new_size - old_size) - (((~(old_size & 4095))+1) & 4095);
+    new_address = mmap((void *)vmbuf_align((size_t)old_address+old_size), first_attempt_size, mmap_prot, mmap_flags, entry.fd, entry.offset+old_size);
+    if ((size_t)new_address != (size_t)vmbuf_align((size_t)old_address+old_size)) {
+      munmap(new_address, first_attempt_size);
+      new_address = mmap(NULL, new_size, mmap_prot, mmap_flags, entry.fd, entry.offset);
+      memcpy(new_address, old_address, old_size);
+      munmap(old_address, old_size);
+      metadata_table_del((uint64_t)old_address);
+      entry.meta &= 4095;
+      entry.meta |= (uint64_t)new_address;
+      metadata_table_insert(entry);
+    } else {
+      new_address = old_address;
+    }
+    
+    return new_address;
+}
 
 /* only available flag is EPOLL_CLOEXEC */
 int epoll_create1(int flags) {
@@ -116,59 +299,7 @@ int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struc
     return ret - ret;
 }
 
-static void set_mmap_metadata(struct mmap_meta *data, size_t length, int prot, int flags) {
-    data->canary = CANARY;
-    data->length = length;
-    data->prot = prot;
-    data->flags = flags;
-}
 
-void *mmap_apple(void *addr, size_t length, int prot, int flags, int fd, off_t offset) {
-    size_t map_size = vmbuf_align(length+sizeof(struct mmap_meta));
-    void *new_addr = mmap(addr, map_size, prot, flags, fd, offset);
-    struct mmap_meta *data = (struct mmap_meta *)(new_addr+length);
-    set_mmap_metadata(data, map_size, prot, flags & ~MAP_FIXED);
-    return new_addr;
-}
-
-int munmap_apple(void *addr, size_t len) {
-    struct mmap_meta *metadata = (struct mmap_meta *)((char *)addr + len);
-    if (metadata->canary != CANARY)
-        return LOGGER_PERROR("either apple.h was not included before the mmap call or the mmap'd buffer was overflown"), -1;
-    return munmap(addr, metadata->length);
-}
-
-void *mremap(void *old_address, size_t old_size, size_t new_size, int flags) {
-    void *new_address;
-    size_t space_needed;
-    size_t map_size = 0;
-    struct mmap_meta metadata = *(struct mmap_meta *)(old_address+old_size);
-    if (flags != 0 && flags != MREMAP_MAYMOVE)
-        return LOGGER_PERROR("only MREMAP_MAYMOVE is supported currently by OSX mremap"), (void *)-1;
-    if (metadata.canary != CANARY)
-        return LOGGER_PERROR("either apple.h was not included before the mmap call or the mmap'd buffer was overflown"), (void *)-1;
-
-    space_needed = (new_size+sizeof(struct mmap_meta)) - metadata.length;
-    if (0 >= space_needed) {
-        memset(old_address+old_size, 0, sizeof(struct mmap_meta));
-        memcpy(old_address+new_size, &metadata, sizeof(struct mmap_meta));
-        return old_address;
-    }
-    map_size = vmbuf_align(metadata.length+space_needed);
-    new_address = mmap((char *)old_address+metadata.length, map_size, metadata.prot, metadata.flags, -1, 0);
-    /* sucessfully appended memory to current mapping */
-    if (new_address == (char *)old_address+metadata.length) {
-        memset(old_address+old_size, 0, sizeof(struct mmap_meta));
-        set_mmap_metadata((struct mmap_meta *)(old_address+new_size), map_size+metadata.length, metadata.prot, metadata.flags);
-        return old_address;
-    /* need to transfer old memory to new mapping */
-    } else {
-        memcpy(new_address, old_address, old_size);
-        munmap(old_address, metadata.length);
-        set_mmap_metadata((struct mmap_meta *)(new_address+new_size), map_size, metadata.prot, metadata.flags);
-        return new_address;
-    }
-}
 
 int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags) {
     int cwd = open(".", O_RDONLY);
