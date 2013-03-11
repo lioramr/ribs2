@@ -10,7 +10,8 @@
 
 void *mremap_apple(void *old_address, size_t old_size, size_t new_size, int prot, int flags, int fd, off_t offset) {
     void *new_address = mmap(NULL, new_size, prot, flags, fd, offset);
-    memcpy(new_address, old_address, old_size);
+    if (prot & (PROT_WRITE | PROT_READ))
+        memcpy(new_address, old_address, old_size);
     munmap(old_address, old_size);
     return new_address;
 }
