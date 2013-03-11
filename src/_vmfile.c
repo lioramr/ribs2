@@ -44,7 +44,7 @@ _RIBS_INLINE_ int TEMPLATE(VMBUF_T,init)(struct VMBUF_T *vmb, const char *filena
 _RIBS_INLINE_ int TEMPLATE(VMBUF_T,resize_to)(struct VMBUF_T *vmb, size_t new_capacity) {
     new_capacity = RIBS_VM_ALIGN(new_capacity);
     VMFILE_FTRUNCATE(new_capacity, "resize_to");
-    char *newaddr = (char *)mremap(vmb->buf, vmb->capacity, new_capacity, MREMAP_MAYMOVE);
+    char *newaddr = (char *)ribs_mremap(vmb->buf, vmb->capacity, new_capacity, PROT_WRITE | PROT_READ, MAP_SHARED, vmb->fd, 0);
     if ((void *)-1 == newaddr)
         return perror("mremap, " STRINGIFY(VMBUF_T) "_resize_to"), -1;
     // success

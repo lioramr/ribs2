@@ -60,7 +60,7 @@ static inline int _lhashtable_resize_to(struct lhashtable *lht, uint64_t new_cap
     _LHT_ALIGN_P2(new_capacity, LHT_BLOCK_SIZE);
     if (0 > ftruncate(lht->fd, new_capacity))
         return LOGGER_PERROR("ftruncate, new size = %zu", new_capacity), -1;
-    void *mem = mremap(lht->mem, LHT_GET_HEADER()->capacity, new_capacity, MREMAP_MAYMOVE);
+    void *mem = ribs_mremap(lht->mem, LHT_GET_HEADER()->capacity, new_capacity, PROT_READ | PROT_WRITE, MAP_SHARED, lht->fd, 0);
     if (MAP_FAILED == mem)
         return LOGGER_PERROR("mremap, new size = %zu", new_capacity), -1;
     lht->mem = mem;

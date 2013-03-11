@@ -22,6 +22,7 @@
 #define current_ctx _current_ctx(%rip)
 #define __ribs_context_exit ___ribs_context_exit
 #define ribs_swapcurcontext _ribs_swapcurcontext
+#define __ribs_context_jump ___ribs_context_jump
 #else
 .extern current_ctx
 #endif

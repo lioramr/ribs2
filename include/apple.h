@@ -76,14 +76,14 @@ int epoll_wait(int epfd, struct epoll_event *events, int maxevents, int timeout)
 int timerfd_create(int clockid, int flags);
 int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struct itimerspec *old_value);
 
-void *mmap_apple(void *addr, size_t length, int prot, int flags, int fd, off_t offset);
-void *mremap(void *old_address, size_t old_size, size_t new_size, int flags);
-int munmap_apple(void *addr, size_t len);
+void *mremap_apple(void *old_address, size_t old_size, size_t new_size, int prot, int flags, int fd, off_t offset);
 int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags);
 long sysconf_apple(int name);
 size_t send_file_apple(int out_fd, int in_fd, off_t *offset, size_t count);
-
-#include "../src/_apple.c"
+int pipe2(int fildes[2], int flags);
+char *strchrnul(const char *s, int c);
+int accept4(int socket, struct sockaddr *addr_buf, socklen_t *addr_len, int flags);
+int socket_apple(int socket_family, int socket_type, int protocol);
 
 /* linux and BSD have different sendfile() routines with same name */
 #define sendfile send_file_apple
@@ -91,8 +91,5 @@ size_t send_file_apple(int out_fd, int in_fd, off_t *offset, size_t count);
 #define sysconf sysconf_apple
 /* redirect socket to socket_apple to handle SOCK_NONBLOCK and SOCK_CLOEXEC flags */
 #define socket socket_apple
-/* need own mmap and munmap as side effect of mremap impl */
-#define mmap mmap_apple
-#define munmap munmap_apple
 
 #endif //_APPLE__H_
