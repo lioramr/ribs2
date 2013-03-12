@@ -21,7 +21,12 @@
 #define _CONTEXT__H_
 
 #include "ribs_defs.h"
+
+#ifdef __APPLE__
+#include "apple.h"
+#else
 #include <sys/epoll.h>
+#endif
 
 #define SMALL_STACK_SIZE 4096
 

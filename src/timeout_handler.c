@@ -33,7 +33,7 @@ static void expiration_handler(void) {
         timersub(&now, &when, &ts);
         struct list *fd_data_list;
         LIST_FOR_EACH(&timeout_handler->timeout_chain, fd_data_list) {
-            struct epoll_worker_fd_data *fd_data = LIST_ENTRY(fd_data_list, struct epoll_worker_fd_data, timeout_chain);
+            struct epoll_worker_fd_data *fd_data = LIST_ENT(fd_data_list, struct epoll_worker_fd_data, timeout_chain);
             if (timercmp(&fd_data->timestamp, &ts, >)) {
                 timersub(&fd_data->timestamp, &ts, &now);
                 struct itimerspec when = {{0,0},{now.tv_sec,now.tv_usec*1000}};
@@ -55,7 +55,7 @@ int timeout_handler_init(struct timeout_handler *timeout_handler) {
     int tfd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
     if (0 > tfd)
         return LOGGER_PERROR("timerfd_create"), -1;
-    timeout_handler->timeout_handler_ctx = small_ctx_for_fd(tfd, expiration_handler);
+    timeout_handler->timeout_handler_ctx = small_ctx_for_timer(tfd, expiration_handler);
     timeout_handler->timeout_handler_ctx->fd = tfd;
     timeout_handler->timeout_handler_ctx->data.ptr = timeout_handler;
     /*

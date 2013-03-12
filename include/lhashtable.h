@@ -24,7 +24,12 @@
 #include "logger.h"
 #include "ilog2.h"
 #include <sys/mman.h>
+#include "ribs_mman.h"
 #include <string.h>
+
+#ifdef __APPLE__
+#include "apple.h"
+#endif
 
 /* linear hashing */
 /*

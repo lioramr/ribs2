@@ -29,6 +29,10 @@
 #include <string.h>
 #include <time.h>
 #include "vm_misc.h"
+#include "ribs_mman.h"
+#ifdef __APPLE__
+#include "apple.h"
+#endif
 #ifdef VMBUF_T
 #undef VMBUF_T
 #endif
@@ -40,6 +44,7 @@ struct vmbuf {
     size_t read_loc;
     size_t write_loc;
 };
+
 
 #define VMBUF_INITIALIZER { NULL, 0, 0, 0 }
 #define VMBUF_INIT(var) (var) = ((struct vmbuf)VMBUF_INITIALIZER)

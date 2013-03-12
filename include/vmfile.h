@@ -32,6 +32,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "vm_misc.h"
+#include "ribs_mman.h"
 #ifdef VMBUF_T
 #undef VMBUF_T
 #endif

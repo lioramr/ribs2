@@ -17,7 +17,16 @@
     You should have received a copy of the GNU Lesser General Public License
     along with RIBS.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+#ifdef __APPLE__
+#define current_ctx _current_ctx(%rip)
+#define __ribs_context_exit ___ribs_context_exit
+#define ribs_swapcurcontext _ribs_swapcurcontext
+#define __ribs_context_jump ___ribs_context_jump
+#else
 .extern current_ctx
+#endif
+
 .globl ribs_swapcurcontext
 .globl __ribs_context_jump
 
