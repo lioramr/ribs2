@@ -112,8 +112,6 @@ int timerfd_settime(int fd, int flags, const struct itimerspec *new_value, struc
     return ret - ret;
 }
 
-
-
 int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags) {
     int cwd = open(".", O_RDONLY);
     int ret_val;
@@ -132,6 +130,7 @@ int fstatat(int dirfd, const char *pathname, struct stat *buf, int flags) {
     }
     if (0 > fchdir(cwd))
         return -1;
+    close(cwd);
     return ret_val;
 }
 
