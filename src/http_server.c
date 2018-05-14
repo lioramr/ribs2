@@ -282,7 +282,7 @@ int http_server_init2(struct http_server *server) {
         SSL_library_init();
         server->ssl_ctx = SSL_CTX_new(SSLv23_server_method());
 
-        if (0 != ribs_ssl_set_options(server->ssl_ctx, server->cipher_list))
+        if (0 != ribs_ssl_set_options(server->ssl_ctx, server->cipher_list, server->dhparam_file))
             return -1;
 
         /* Chain file must start with the server's certificate, appended by the authority certs */
@@ -608,8 +608,6 @@ void http_server_fiber_main(void) {
                 return;
             }
         }
-        /* disable client initiated renegotiate CVE-2009-3555 */
-        ssl->s3->flags |= SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS;
     }
 #endif
 

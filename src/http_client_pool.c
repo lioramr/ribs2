@@ -139,7 +139,7 @@ int http_client_pool_init_ssl(struct http_client_pool *http_client_pool, size_t 
     SSL_load_error_strings();
     http_client_pool->ssl_ctx = SSL_CTX_new(SSLv23_client_method());
 
-    if (0 != ribs_ssl_set_options(http_client_pool->ssl_ctx, NULL))
+    if (0 != ribs_ssl_set_options(http_client_pool->ssl_ctx, NULL, NULL))
         return -1;
 
     if (cacert) {
@@ -439,7 +439,7 @@ void http_client_fiber_main(void) {
                     const GENERAL_NAME *current_name = sk_GENERAL_NAME_value(san_names, i);
                     if (current_name->type == GEN_DNS) {
                         // Current name is a DNS name, let's check it
-                        char *dns_name = (char *) ASN1_STRING_data(current_name->d.dNSName);
+                        char *dns_name = (char *) ASN1_STRING_get0_data(current_name->d.dNSName);
                         // RFC2818
                         if (ndots(dns_name) == hdots &&
                             0 == fnmatch(dns_name, ctx->hostname, FNM_NOESCAPE|FNM_PATHNAME|FNM_PERIOD|FNM_CASEFOLD)) {
@@ -458,7 +458,7 @@ void http_client_fiber_main(void) {
                     if (common_name_entry != NULL) {
                         ASN1_STRING *common_name_asn1 = X509_NAME_ENTRY_get_data(common_name_entry);
                         if (common_name_asn1 != NULL) {
-                            char *common_name_str = (char *) ASN1_STRING_data(common_name_asn1);
+                            char *common_name_str = (char *) ASN1_STRING_get0_data(common_name_asn1);
                             // RFC2818
                             if (ndots(common_name_str) == hdots &&
                                 0 == fnmatch(common_name_str, ctx->hostname, FNM_NOESCAPE|FNM_PATHNAME|FNM_PERIOD|FNM_CASEFOLD))

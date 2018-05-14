@@ -66,7 +66,7 @@ function test_https()
     openssl req -new -x509 -days 365 -nodes -out httpd.pem -keyout httpd.key -batch >/dev/null 2>&1 || die "openssl req"
     echo '[OK]' >&2
     echo -n "Starting httpd with SSL enabled... " >&2
-    examples/httpd/bin/httpd -d -p0 -s0 -k httpd.key -c httpd.pem >/dev/null || killhttpd "httpd failed to start with ssl"
+    examples/httpd/bin/httpd -d -p0 -s0 -k httpd.key -c httpd.pem -h examples/httpd/dhparam.pem >/dev/null || killhttpd "httpd failed to start with ssl"
     echo '[OK]' >&2
     port=$(cat httpd.sport)
     run_tests https

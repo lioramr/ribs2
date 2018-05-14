@@ -82,6 +82,7 @@ int main(int argc, char *argv[]) {
         {"key_file", 1, 0, 'k'},
         {"chain_file", 1, 0, 'c'},
         {"cipher_list", 1, 0, 'l'},
+        {"dhparam_file", 1, 0, 'h'},
 #endif
         {0, 0, 0, 0}
     };
@@ -94,12 +95,13 @@ int main(int argc, char *argv[]) {
     char *key_file = NULL;
     char *chain_file = NULL;
     char *cipher_list = NULL;
+    char *dhparam_file = NULL;
 #endif
     for (;;) {
         int option_index = 0;
         int c = getopt_long(argc, argv, "dp:f:"
 #ifdef RIBS2_SSL
-                            "s:c:k:l:"
+                            "s:c:k:l:h:"
 #endif
                             , long_options, &option_index);
         if (c == -1)
@@ -126,6 +128,9 @@ int main(int argc, char *argv[]) {
             break;
         case 'l':
             cipher_list = optarg;
+            break;
+        case 'h':
+            dhparam_file = optarg;
             break;
 #endif
         }
@@ -209,6 +214,7 @@ int main(int argc, char *argv[]) {
     server_ssl.use_ssl = 1,
     server_ssl.privatekey_file = key_file,
     server_ssl.certificate_chain_file = chain_file;
+    server_ssl.dhparam_file = dhparam_file;
 
     if (cipher_list)
         server_ssl.cipher_list = cipher_list;

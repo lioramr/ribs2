@@ -70,6 +70,7 @@ struct http_server {
     char *cipher_list;
     char *privatekey_file;
     char *certificate_chain_file;
+    char *dhparam_file;
 #endif
     int (*http_server_read)(struct http_server_context *ctx);
     int (*http_server_write)(struct http_server_context *ctx);

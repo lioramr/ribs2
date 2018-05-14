@@ -62,7 +62,7 @@ int ribs_ssl_want_io(SSL *ssl, int res) {
             SSL_ERROR_WANT_READ == err);
 }
 
-int ribs_ssl_set_options(SSL_CTX *ssl_ctx, char *cipher_list) {
+int ribs_ssl_set_options(SSL_CTX *ssl_ctx, char *cipher_list, char *dhparam_file) {
     /* bugs */
     SSL_CTX_set_options(ssl_ctx, SSL_OP_ALL); /* almost all bugs */
     SSL_CTX_set_options(ssl_ctx, SSL_OP_NO_SSLv2); /* disable SSLv2 per RFC 6176 */
@@ -77,14 +77,24 @@ int ribs_ssl_set_options(SSL_CTX *ssl_ctx, char *cipher_list) {
     if (0 == SSL_CTX_set_cipher_list(ssl_ctx, cipher_list))
         return LOGGER_ERROR("failed to initialize SSL:cipher_list"), -1;
 
-    /* DH 2048 bits */
-    SSL_CTX_set_options(ssl_ctx, SSL_OP_SINGLE_DH_USE);
-    DH *dh = DH_new();
-    dh->p = get_rfc3526_prime_2048(NULL);
-    BN_dec2bn(&dh->g, "2");
-    if (0 == SSL_CTX_set_tmp_dh(ssl_ctx, dh))
-        return LOGGER_ERROR("failed to initialize SSL:dh"), -1;
-    DH_free(dh);
+    if (dhparam_file) {
+        /* DH 2048 bits */
+        SSL_CTX_set_options(ssl_ctx, SSL_OP_SINGLE_DH_USE);
+
+        DH *dh = NULL;
+        FILE *paramfile;
+        paramfile = fopen(dhparam_file, "r");
+        if (!paramfile)
+            return LOGGER_ERROR("Can't open dhparam file"), -1;
+        dh = PEM_read_DHparams(paramfile, NULL, NULL, NULL);
+        if (!dh)
+            return LOGGER_ERROR("Error reading dhparam file"), -1;
+        fclose(paramfile);
+
+        if (0 == SSL_CTX_set_tmp_dh(ssl_ctx, dh))
+            return LOGGER_ERROR("failed to initialize SSL:dh"), -1;
+        DH_free(dh);
+    }
 
     /* Ecliptic Curve DH */
     SSL_CTX_set_options(ssl_ctx, SSL_OP_SINGLE_ECDH_USE);
